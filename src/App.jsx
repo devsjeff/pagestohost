@@ -1,665 +1,880 @@
-import { useState, useEffect, useRef, useContext, createContext, Component } from "react";
+import { useState, useReducer, useMemo, useCallback, memo, createContext, useContext, lazy, Suspense } from "react";
 
 const topics = [
   {
-    id: 10,
-    emoji: "🔁",
-    title: "useEffect",
+    id: 19,
+    emoji: "⚙️",
+    title: "useReducer",
     color: "#61DAFB",
     theory: [
-      "useEffect is a Hook that lets you run side effects in a functional component.",
-      "A side effect is anything that reaches outside the component: fetching data, setting a timer, manually changing the DOM, subscribing to events.",
-      "useEffect runs AFTER React renders the component to the screen — not during render.",
-      "It takes two arguments: a callback function (the effect) and a dependency array that controls WHEN the effect runs.",
+      "useReducer is an alternative to useState for managing complex state logic inside a component.",
+      "Instead of calling a setter directly, you dispatch an action object, and a reducer function decides how state changes based on that action.",
+      "This is the same pattern Redux uses — useReducer is basically a built-in mini-Redux.",
+      "Use useReducer when state has multiple sub-values, or when the next state depends on the previous one in complex ways.",
     ],
     notes: [
-      "useEffect(() => {}, []) — runs ONCE after the first render (like componentDidMount).",
-      "useEffect(() => {}) — no dependency array → runs after EVERY render. Usually not what you want.",
-      "useEffect(() => {}, [count]) — runs after first render AND whenever count changes.",
-      "Return a cleanup function to cancel subscriptions, timers, etc. when the component unmounts.",
-      "Never put async directly inside useEffect. Define async function inside and call it.",
+      "useReducer(reducer, initialState) returns [state, dispatch].",
+      "reducer is a pure function: (state, action) => newState. Never mutate state directly inside it.",
+      "dispatch({ type: 'INCREMENT' }) — you send an action, the reducer decides the outcome.",
+      "Actions usually have a type string and optionally a payload: { type: 'ADD', payload: 'text' }.",
+      "Rule of thumb: 3+ related state values or complex transitions → prefer useReducer over useState.",
     ],
-    code: `import { useState, useEffect } from "react";
+    code: `import { useReducer, useState } from "react";
 
-// [] = run only once after first render
-function UserProfile() {
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    async function fetchUser() {
-      const res = await fetch("https://jsonplaceholder.typicode.com/users/1");
-      const data = await res.json();
-      setUser(data);
-    }
-    fetchUser();
-  }, []);
-
-  if (!user) return <p>Loading...</p>;
-  return <h2>Hello, {user.name}!</h2>;
+function counterReducer(state, action) {
+  switch (action.type) {
+    case "INCREMENT": return { count: state.count + 1 };
+    case "DECREMENT": return { count: state.count - 1 };
+    case "RESET":     return { count: 0 };
+    case "SET":       return { count: action.payload };
+    default:          return state;
+  }
 }
 
-// [query] = re-run whenever query changes
-function SearchBox({ query }) {
-  useEffect(() => {
-    if (!query) return;
-    console.log("Searching:", query);
-  }, [query]);
-
-  return <div>Search box</div>;
+function Counter() {
+  const [state, dispatch] = useReducer(counterReducer, { count: 0 });
+  return (
+    <div>
+      <p>Count: {state.count}</p>
+      <button onClick={() => dispatch({ type: "INCREMENT" })}>+1</button>
+      <button onClick={() => dispatch({ type: "DECREMENT" })}>-1</button>
+      <button onClick={() => dispatch({ type: "RESET" })}>Reset</button>
+      <button onClick={() => dispatch({ type: "SET", payload: 100 })}>Set 100</button>
+    </div>
+  );
 }
 
-// Cleanup example — clear timer on unmount
-function Timer() {
-  const [seconds, setSeconds] = useState(0);
+function todoReducer(state, action) {
+  switch (action.type) {
+    case "ADD":
+      return [...state, { id: Date.now(), text: action.payload, done: false }];
+    case "TOGGLE":
+      return state.map((t) =>
+        t.id === action.payload ? { ...t, done: !t.done } : t
+      );
+    case "DELETE":
+      return state.filter((t) => t.id !== action.payload);
+    default:
+      return state;
+  }
+}
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setSeconds((s) => s + 1);
-    }, 1000);
+function TodoApp() {
+  const [todos, dispatch] = useReducer(todoReducer, []);
+  const [input, setInput] = useState("");
 
-    return () => clearInterval(interval); // cleanup!
-  }, []);
+  function add() {
+    if (!input.trim()) return;
+    dispatch({ type: "ADD", payload: input });
+    setInput("");
+  }
 
-  return <p>Timer: {seconds}s</p>;
+  return (
+    <div>
+      <input value={input} onChange={(e) => setInput(e.target.value)} />
+      <button onClick={add}>Add</button>
+      <ul>
+        {todos.map((t) => (
+          <li key={t.id} style={{ textDecoration: t.done ? "line-through" : "none" }}>
+            {t.text}
+            <button onClick={() => dispatch({ type: "TOGGLE", payload: t.id })}>✓</button>
+            <button onClick={() => dispatch({ type: "DELETE", payload: t.id })}>✕</button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }`,
   },
   {
-    id: 11,
-    emoji: "📋",
-    title: "Forms & Controlled Components",
+    id: 20,
+    emoji: "⚡",
+    title: "useMemo & useCallback",
     color: "#F7DF1E",
     theory: [
-      "In React, a controlled component is one where React controls the form input's value via state.",
-      "Every keystroke updates state, and the input's value is always driven by that state — React is the single source of truth.",
-      "This is the opposite of uncontrolled components, where the DOM itself holds the value.",
-      "Controlled components give you full control: validation, formatting, conditional disabling — all easy.",
+      "useMemo and useCallback are performance optimization hooks that prevent expensive recalculations and function recreation on every render.",
+      "useMemo memoizes a computed value — only recalculates when its dependencies change.",
+      "useCallback memoizes a function reference — only creates a new function when its dependencies change.",
+      "Important: do not use these everywhere. Memoization has its own cost. Only add them after identifying a real performance problem.",
     ],
     notes: [
-      "Always pair value={state} with onChange={handler} on an input. Without onChange, the input becomes read-only.",
-      "For checkboxes use checked={bool} instead of value.",
-      "For select elements, put value on the select tag, not on option tags.",
-      "e.preventDefault() in onSubmit stops page reload.",
-      "Use a single state object for multi-field forms with one shared handler using e.target.name.",
+      "useMemo(() => expensiveCalc(), [dep]) — recalculates only when dep changes.",
+      "useCallback(() => myFn(), [dep]) — returns the same function reference unless dep changes.",
+      "Main use for useCallback: pass stable functions to children wrapped in React.memo.",
+      "Main use for useMemo: expensive computations like filtering or sorting large arrays.",
+      "If your app feels fast without them — skip them. Premature optimization is the root of all evil.",
+    ],
+    code: `import { useState, useMemo, useCallback, memo } from "react";
+
+// --- useMemo: skip expensive recomputation ---
+function FilteredList({ items, filter }) {
+  const filtered = useMemo(() => {
+    console.log("Filtering...");
+    return items.filter((item) =>
+      item.toLowerCase().includes(filter.toLowerCase())
+    );
+  }, [items, filter]);
+
+  return <ul>{filtered.map((x, i) => <li key={i}>{x}</li>)}</ul>;
+}
+
+// --- useCallback: stable function reference ---
+const ChildButton = memo(function ChildButton({ onClick, label }) {
+  console.log("Child rendered:", label);
+  return <button onClick={onClick}>{label}</button>;
+});
+
+function Parent() {
+  const [count, setCount] = useState(0);
+  const [other, setOther] = useState(0);
+
+  const handleIncrement = useCallback(() => {
+    setCount((c) => c + 1);
+  }, []);
+
+  return (
+    <div>
+      <p>Count: {count} | Other: {other}</p>
+      <ChildButton onClick={handleIncrement} label="Increment" />
+      <button onClick={() => setOther((o) => o + 1)}>
+        Change Other (child stays the same)
+      </button>
+    </div>
+  );
+}`,
+  },
+  {
+    id: 21,
+    emoji: "🧠",
+    title: "React.memo",
+    color: "#FF6B6B",
+    theory: [
+      "React.memo is a higher-order component that prevents a component from re-rendering if its props have not changed.",
+      "By default React re-renders a child whenever its parent re-renders — even if the child receives the exact same props.",
+      "React.memo does a shallow comparison of props. If references are the same, the render is skipped entirely.",
+      "memo only blocks re-renders caused by the parent. If the component's own state or context changes, it still re-renders.",
+    ],
+    notes: [
+      "Wrap a component: const MyComp = memo(function MyComp(props) { ... })",
+      "Shallow comparison checks object and function references — not deep equality.",
+      "For object or array props, memoize the value with useMemo. For function props, use useCallback.",
+      "Most useful when a component renders often, receives the same props often, and is expensive to render.",
+      "Do not wrap every component — the comparison itself costs something. Use where re-renders are provably wasteful.",
+    ],
+    code: `import { useState, memo } from "react";
+
+// Without memo — re-renders on every parent render
+function RegularChild({ name }) {
+  console.log("RegularChild rendered");
+  return <p>Regular: {name}</p>;
+}
+
+// With memo — only re-renders when name prop actually changes
+const MemoizedChild = memo(function MemoizedChild({ name }) {
+  console.log("MemoizedChild rendered");
+  return <p>Memoized: {name}</p>;
+});
+
+// Custom comparison — full control over when to re-render
+const SmartChild = memo(
+  function SmartChild({ id }) {
+    console.log("SmartChild rendered, id:", id);
+    return <p>Smart ID: {id}</p>;
+  },
+  (prev, next) => prev.id === next.id
+  // return true  -> skip re-render
+  // return false -> allow re-render
+);
+
+function Parent() {
+  const [count, setCount] = useState(0);
+  const [name] = useState("Devendra");
+
+  return (
+    <div>
+      <p>Parent count: {count}</p>
+      <button onClick={() => setCount((c) => c + 1)}>Re-render Parent</button>
+      <hr />
+      <RegularChild name={name} />   {/* always re-renders */}
+      <MemoizedChild name={name} />  {/* skips — name unchanged */}
+      <SmartChild id={42} />         {/* skips — id unchanged */}
+    </div>
+  );
+}`,
+  },
+  {
+    id: 22,
+    emoji: "✂️",
+    title: "Code Splitting & Lazy Loading",
+    color: "#A78BFA",
+    theory: [
+      "Code splitting breaks your app bundle into smaller chunks that download only when needed, rather than loading everything upfront.",
+      "React.lazy lets you dynamically import a component — its JS chunk is only fetched when the component first renders.",
+      "Suspense is the wrapper that shows a fallback UI while the lazy component chunk is downloading.",
+      "This massively improves initial load time — users only download the code for pages they actually visit.",
+    ],
+    notes: [
+      "const MyComp = lazy(() => import('./MyComp')) — dynamic import, loads the file on demand.",
+      "Always wrap lazy components in a Suspense boundary with a fallback prop.",
+      "Best split points: route-level pages, heavy feature sections, modals, data visualizations.",
+      "React.lazy only works with default exports from the imported module.",
+      "In production, Vite and Webpack automatically create separate .js chunk files per lazy import.",
+    ],
+    code: `import { useState, lazy, Suspense } from "react";
+
+// In a real project these live in separate files:
+// const HeavyChart   = lazy(() => import('./HeavyChart'));
+// const AdminPanel   = lazy(() => import('./AdminPanel'));
+
+// Simulated heavy components for this demo
+function HeavyChart()   { return <div>📊 Heavy Chart — loaded on demand</div>; }
+function AdminPanel()   { return <div>🔒 Admin Panel — loaded on demand</div>; }
+function UserSettings() { return <div>⚙️  Settings  — loaded on demand</div>; }
+
+function App() {
+  const [page, setPage] = useState(null);
+
+  return (
+    <div>
+      <nav style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        <button onClick={() => setPage("chart")}>Chart</button>
+        <button onClick={() => setPage("admin")}>Admin</button>
+        <button onClick={() => setPage("settings")}>Settings</button>
+      </nav>
+
+      <Suspense fallback={<p>Loading component...</p>}>
+        {page === "chart"    && <HeavyChart />}
+        {page === "admin"    && <AdminPanel />}
+        {page === "settings" && <UserSettings />}
+      </Suspense>
+
+      {!page && (
+        <p style={{ color: "#8b949e" }}>
+          Click a button. In a real app each section is a
+          separate JS chunk — downloaded only on first visit.
+        </p>
+      )}
+    </div>
+  );
+}`,
+  },
+  {
+    id: 23,
+    emoji: "🌀",
+    title: "Portals",
+    color: "#34D399",
+    theory: [
+      "A Portal renders a component's output into a different DOM node than its parent, escaping the normal component hierarchy.",
+      "Normally a component renders inside its parent's DOM node. With a portal you can target any node — like document.body.",
+      "Most common use cases: modals, tooltips, and dropdowns that need to escape overflow:hidden or z-index stacking on a parent.",
+      "Even though a portal renders elsewhere in the DOM, it still behaves like a normal React child — events bubble through the React tree as expected.",
+    ],
+    notes: [
+      "createPortal(children, domNode) is a function from the core React library that renders children into domNode.",
+      "The target DOM node must exist first — usually document.body or a dedicated div in index.html.",
+      "Event bubbling follows the React component tree, NOT the real DOM tree — React events still work normally.",
+      "State and Context work fine inside portals — they remain part of the React component tree.",
+      "The demo below simulates portal behaviour with fixed positioning so you can see the concept live.",
     ],
     code: `import { useState } from "react";
 
-function LoginForm() {
-  const [form, setForm] = useState({ email: "", password: "" });
-  const [error, setError] = useState("");
+// Portal API (for your real project):
+//   createPortal(<YourModal />, document.body)
+// Renders YourModal into document.body instead of inside
+// the parent component — escaping overflow:hidden or z-index.
 
-  function handleChange(e) {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+// Working modal demo — simulates portal visual result
+function Modal({ isOpen, onClose, children }) {
+  if (!isOpen) return null;
+  return (
+    <div style={{
+      position: "fixed", inset: 0,
+      background: "rgba(0,0,0,0.6)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      zIndex: 1000,
+    }}>
+      <div style={{
+        background: "#161b22",
+        border: "1px solid #30363d",
+        borderRadius: 12, padding: 24, minWidth: 280,
+      }}>
+        {children}
+        <button onClick={onClose} style={{
+          marginTop: 16, padding: "8px 16px",
+          background: "#FF6B6B", color: "#fff",
+          border: "none", borderRadius: 6, cursor: "pointer",
+        }}>
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{
+      overflow: "hidden",
+      border: "2px solid #FF6B6B",
+      padding: 16, borderRadius: 8,
+    }}>
+      <p>Parent has overflow:hidden — a real portal escapes it.</p>
+      <button onClick={() => setOpen(true)}>Open Modal</button>
+      <Modal isOpen={open} onClose={() => setOpen(false)}>
+        <h3>Modal via Portal</h3>
+        <p>In production: wrap this JSX in createPortal and it
+           renders directly into document.body.</p>
+      </Modal>
+    </div>
+  );
+}`,
+  },
+  {
+    id: 24,
+    emoji: "🔗",
+    title: "Compound Components",
+    color: "#FB923C",
+    theory: [
+      "Compound Components let a group of components share implicit state through Context — no prop threading required.",
+      "Think of HTML select and option tags — they work together without you wiring them. Compound components do the same in React.",
+      "A parent component owns the state and provides it via Context. Child components consume that context automatically.",
+      "This gives consumers a clean expressive API with no prop drilling and no awkward config objects.",
+    ],
+    notes: [
+      "The parent creates a Context and wraps children in a Provider.",
+      "Sub-components (Tab, Panel, Item) read shared state from Context instead of receiving it as props.",
+      "Attach sub-components to the parent as properties: Tabs.Tab, Tabs.Panel — one clean import for everything.",
+      "This is how popular headless UI libraries are built under the hood.",
+      "Best for: Tabs, Accordion, Select, Dropdown, Stepper — any set of components that logically belong together.",
+    ],
+    code: `import { useState, useContext, createContext } from "react";
+
+const TabsCtx = createContext(null);
+
+function Tabs({ children, defaultTab = 0 }) {
+  const [active, setActive] = useState(defaultTab);
+  return (
+    <TabsCtx.Provider value={{ active, setActive }}>
+      <div>{children}</div>
+    </TabsCtx.Provider>
+  );
+}
+
+function TabList({ children }) {
+  return (
+    <div style={{
+      display: "flex", gap: 4,
+      borderBottom: "2px solid #30363d", marginBottom: 16,
+    }}>
+      {children}
+    </div>
+  );
+}
+
+function Tab({ children, index }) {
+  const { active, setActive } = useContext(TabsCtx);
+  const on = active === index;
+  return (
+    <button onClick={() => setActive(index)} style={{
+      padding: "8px 16px", cursor: "pointer", fontFamily: "inherit",
+      background: on ? "#FB923C22" : "transparent",
+      color: on ? "#FB923C" : "#8b949e",
+      border: "none",
+      borderBottom: on ? "2px solid #FB923C" : "2px solid transparent",
+    }}>
+      {children}
+    </button>
+  );
+}
+
+function TabPanel({ children, index }) {
+  const { active } = useContext(TabsCtx);
+  return active === index ? <div>{children}</div> : null;
+}
+
+Tabs.TabList  = TabList;
+Tabs.Tab      = Tab;
+Tabs.TabPanel = TabPanel;
+
+function App() {
+  return (
+    <Tabs defaultTab={0}>
+      <Tabs.TabList>
+        <Tabs.Tab index={0}>Profile</Tabs.Tab>
+        <Tabs.Tab index={1}>Settings</Tabs.Tab>
+        <Tabs.Tab index={2}>Billing</Tabs.Tab>
+      </Tabs.TabList>
+      <Tabs.TabPanel index={0}><p>Profile content</p></Tabs.TabPanel>
+      <Tabs.TabPanel index={1}><p>Settings content</p></Tabs.TabPanel>
+      <Tabs.TabPanel index={2}><p>Billing content</p></Tabs.TabPanel>
+    </Tabs>
+  );
+}`,
+  },
+  {
+    id: 25,
+    emoji: "🎭",
+    title: "Render Props",
+    color: "#F472B6",
+    theory: [
+      "The Render Props pattern is when a component receives a function as a prop and calls it to decide what to render.",
+      "This lets you share stateful logic while giving the consumer full control over the UI output.",
+      "The component with the logic calls props.render(state) and passes its internal state as arguments.",
+      "Custom hooks have largely replaced render props — but the pattern still appears in many libraries and older codebases.",
+    ],
+    notes: [
+      "The render prop can be named anything: render, children, or any custom name.",
+      "Using children as the render prop is called the 'function as children' pattern.",
+      "Custom hooks are now preferred — same result, cleaner syntax, no extra nesting.",
+      "Both render props and custom hooks solve the same problem: sharing stateful logic between components.",
+      "You will encounter this pattern reading library source code, so knowing it is still valuable.",
+    ],
+    code: `import { useState } from "react";
+
+// MouseTracker owns the tracking logic.
+// The consumer decides what to display with that data.
+function MouseTracker({ render }) {
+  const [pos, setPos] = useState({ x: 0, y: 0 });
+  return (
+    <div
+      onMouseMove={(e) => setPos({ x: e.clientX, y: e.clientY })}
+      style={{ height: 90, border: "1px dashed #30363d", borderRadius: 8 }}
+    >
+      {render(pos)}
+    </div>
+  );
+}
+
+// Counter shares logic — consumer controls the UI shape
+function SharedCounter({ children }) {
+  const [count, setCount] = useState(0);
+  return children({
+    count,
+    increment: () => setCount((c) => c + 1),
+    decrement: () => setCount((c) => c - 1),
+    reset:     () => setCount(0),
+  });
+}
+
+function App() {
+  return (
+    <div>
+      <MouseTracker
+        render={({ x, y }) => (
+          <p style={{ padding: 12 }}>Mouse position: ({x}, {y})</p>
+        )}
+      />
+
+      <br />
+
+      <SharedCounter>
+        {({ count, increment, decrement, reset }) => (
+          <div>
+            <p>Count: {count}</p>
+            <button onClick={increment}>+</button>{" "}
+            <button onClick={decrement}>-</button>{" "}
+            <button onClick={reset}>Reset</button>
+          </div>
+        )}
+      </SharedCounter>
+    </div>
+  );
+}`,
+  },
+  {
+    id: 26,
+    emoji: "🗃️",
+    title: "State Management Libraries",
+    color: "#38BDF8",
+    theory: [
+      "For large apps, passing state via props or Context alone gets unwieldy. Dedicated state libraries provide a structured global store.",
+      "Zustand is the modern lightweight choice — minimal boilerplate, hooks-based API, no Provider setup needed.",
+      "Redux Toolkit is the official modern Redux — far simpler than classic Redux, dominant in enterprise projects.",
+      "Both solve the same core problem: a single global source of truth that any component can read and update.",
+    ],
+    notes: [
+      "Zustand: create a store with create(), then call it as a custom hook anywhere. No Provider required.",
+      "Redux Toolkit: createSlice bundles your reducer and actions. configureStore wires them. Wrap app in Provider.",
+      "useSelector reads from the Redux store. useDispatch sends actions to it.",
+      "Zustand is simpler and great for most projects. Use Redux Toolkit when the team already has it.",
+      "Other options worth knowing: Jotai (atomic state), MobX (reactive OOP style), Recoil (also atomic).",
+    ],
+    code: `// ── ZUSTAND ──────────────────────────────────
+// Create a store — call outside any component
+
+const useCounterStore = create((set) => ({
+  count: 0,
+  increment: () => set((s) => ({ count: s.count + 1 })),
+  decrement: () => set((s) => ({ count: s.count - 1 })),
+  reset:     () => set({ count: 0 }),
+}));
+
+// Use the hook in any component — no Provider needed!
+function ZustandCounter() {
+  const { count, increment, decrement, reset } = useCounterStore();
+  return (
+    <div>
+      <p>Count: {count}</p>
+      <button onClick={increment}>+</button>
+      <button onClick={decrement}>-</button>
+      <button onClick={reset}>Reset</button>
+    </div>
+  );
+}
+
+
+// ── REDUX TOOLKIT ─────────────────────────────
+// createSlice bundles reducer + actions together
+
+const counterSlice = createSlice({
+  name: "counter",
+  initialState: { value: 0 },
+  reducers: {
+    increment: (state) => { state.value += 1; },
+    decrement: (state) => { state.value -= 1; },
+    setTo:     (state, action) => { state.value = action.payload; },
+  },
+});
+
+const store = configureStore({
+  reducer: { counter: counterSlice.reducer },
+});
+
+function RTKCounter() {
+  const count    = useSelector((state) => state.counter.value);
+  const dispatch = useDispatch();
+  return (
+    <div>
+      <p>{count}</p>
+      <button onClick={() => dispatch(counterSlice.actions.increment())}>+</button>
+      <button onClick={() => dispatch(counterSlice.actions.decrement())}>-</button>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <Provider store={store}>
+      <RTKCounter />
+    </Provider>
+  );
+}`,
+  },
+  {
+    id: 27,
+    emoji: "📡",
+    title: "Data Fetching Libraries",
+    color: "#FBBF24",
+    theory: [
+      "TanStack Query (also called React Query) is the gold standard for server state — it handles fetching, caching, background refetching, and sync automatically.",
+      "Server state is different from UI state — it can go stale, needs periodic sync, and is often shared across many components.",
+      "Without a library you write useEffect plus useState for every fetch and manage caching manually. TanStack Query does all of that in one hook.",
+      "SWR by Vercel is a lighter alternative with a similar API — a great fit for Next.js projects.",
+    ],
+    notes: [
+      "Install TanStack Query via npm, then wrap your app once in QueryClientProvider.",
+      "useQuery({ queryKey: ['users'], queryFn: fetchUsers }) — auto-handles loading, error, data, and caching.",
+      "queryKey is the cache identifier — same key anywhere in the app shares the same cached data.",
+      "useMutation handles POST/PUT/DELETE. Invalidate a queryKey after success to trigger a refetch.",
+      "By default data is cached and reused. Background refetch fires when the browser tab regains focus.",
+      "The DevTools package lets you inspect the full query cache visually in the browser.",
+    ],
+    code: `// TanStack Query setup (done once at app root):
+//   const qc = new QueryClient()
+//   <QueryClientProvider client={qc}><App /></QueryClientProvider>
+
+// Plain fetch helpers — no library required
+async function fetchUsers() {
+  const res = await fetch("https://jsonplaceholder.typicode.com/users");
+  return res.json();
+}
+
+async function addUser(data) {
+  const res = await fetch("https://jsonplaceholder.typicode.com/users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  return res.json();
+}
+
+// useQuery: one hook replaces useEffect + useState + caching
+function UsersList() {
+  const client = useQueryClient();
+
+  const { data: users, isLoading, isError } = useQuery({
+    queryKey:  ["users"],    // unique cache key
+    queryFn:   fetchUsers,   // must return a promise
+    staleTime: 60 * 1000,    // data stays fresh for 60 s
+  });
+
+  // useMutation: handles write operations cleanly
+  const mutation = useMutation({
+    mutationFn: addUser,
+    onSuccess: () => {
+      // Mark users cache stale -> background refetch fires
+      client.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+
+  if (isLoading) return <p>Loading...</p>;
+  if (isError)   return <p>Error loading users</p>;
+
+  return (
+    <div>
+      <ul>
+        {users.slice(0, 3).map((u) => <li key={u.id}>{u.name}</li>)}
+      </ul>
+      <button onClick={() => mutation.mutate({ name: "New User" })}>
+        Add User
+      </button>
+    </div>
+  );
+}`,
+  },
+  {
+    id: 28,
+    emoji: "🔷",
+    title: "TypeScript with React",
+    color: "#61DAFB",
+    theory: [
+      "TypeScript adds static types to JavaScript — you describe the shape of your data and TypeScript catches mistakes at compile time before they become runtime bugs.",
+      "With React and TypeScript you type props, state, event handlers, and refs — getting autocomplete and editor errors for free.",
+      "TypeScript does not change how React works — it just adds a type layer on top. Your .jsx files become .tsx files.",
+      "Create a typed project: npm create vite@latest my-app -- --template react-ts",
+    ],
+    notes: [
+      "Type props with an interface: interface Props { name: string; age: number }",
+      "useState with a generic: const [count, setCount] = useState<number>(0)",
+      "Optional props use ?: interface Props { label?: string }",
+      "Event types: React.ChangeEvent<HTMLInputElement>, React.MouseEvent<HTMLButtonElement>",
+      "Children: React.ReactNode covers any valid JSX content passed between tags.",
+      "Refs: useRef<HTMLInputElement>(null) — always pass null as the initial value for DOM refs.",
+    ],
+    code: `// TypeScript React files use the .tsx extension
+
+// ── Typing Props ──
+interface ButtonProps {
+  label: string;
+  onClick: () => void;
+  variant?: "primary" | "danger";
+  disabled?: boolean;
+}
+
+function Button({ label, onClick, variant = "primary", disabled = false }: ButtonProps) {
+  return <button onClick={onClick} disabled={disabled}>{label}</button>;
+}
+
+// ── Typing useState ──
+const [count, setCount] = useState<number>(0);
+const [user,  setUser]  = useState<User | null>(null);
+const [items, setItems] = useState<string[]>([]);
+
+// ── Typing a data model ──
+interface User {
+  id: number;
+  name: string;
+  email: string;
+  role: "admin" | "user" | "guest";
+}
+
+function UserCard({ user }: { user: User }) {
+  return (
+    <div>
+      <h3>{user.name}</h3>
+      <p>{user.email} — {user.role}</p>
+    </div>
+  );
+}
+
+// ── Typing event handlers ──
+function SearchInput() {
+  const [query, setQuery] = useState<string>("");
+
+  function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
+    setQuery(e.target.value);
   }
-
-  function handleSubmit(e) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!form.email || !form.password) {
-      setError("Both fields are required.");
-      return;
-    }
-    setError("");
-    alert("Submitted: " + form.email);
+    console.log("Query:", query);
   }
 
   return (
     <form onSubmit={handleSubmit}>
-      <input
-        type="email"
-        name="email"
-        value={form.email}
-        onChange={handleChange}
-        placeholder="Email"
-      />
-      <input
-        type="password"
-        name="password"
-        value={form.password}
-        onChange={handleChange}
-        placeholder="Password"
-      />
-      {error && <p style={{ color: "red" }}>{error}</p>}
-      <button type="submit">Login</button>
+      <input value={query} onChange={handleChange} />
+      <button type="submit">Search</button>
     </form>
   );
 }
 
-// Checkbox + Select
-function Preferences() {
-  const [agreed, setAgreed] = useState(false);
-  const [country, setCountry] = useState("india");
+// ── Typing children ──
+interface CardProps {
+  title: string;
+  children: React.ReactNode;
+}
+function Card({ title, children }: CardProps) {
+  return <div><h2>{title}</h2>{children}</div>;
+}
 
-  return (
-    <div>
-      <input
-        type="checkbox"
-        checked={agreed}
-        onChange={(e) => setAgreed(e.target.checked)}
-      />
-      <label> I agree to terms</label>
-      <br />
-      <select value={country} onChange={(e) => setCountry(e.target.value)}>
-        <option value="india">India</option>
-        <option value="usa">USA</option>
-        <option value="uk">UK</option>
-      </select>
-    </div>
-  );
-}`,
+// ── Typing useRef ──
+const inputRef = useRef<HTMLInputElement>(null);
+inputRef.current?.focus();`,
   },
   {
-    id: 12,
-    emoji: "🏋️",
-    title: "Lifting State Up",
-    color: "#FF6B6B",
-    theory: [
-      "When two sibling components need to share the same state, you lift that state up to their closest common parent.",
-      "The parent holds the state and passes it down as props to both children.",
-      "The parent also passes down handler functions so children can request state changes — since props are read-only.",
-      "Data flows down (props), events flow up (callbacks). This is the core of React's one-way data flow.",
-    ],
-    notes: [
-      "If two components need the same data, their state belongs in their closest common ancestor.",
-      "The child never modifies state directly — it calls a function passed down from the parent.",
-      "This pattern scales well but can get tedious with many levels — that's when Context or state managers help.",
-      "The parent is the single source of truth for shared state.",
-    ],
-    code: `import { useState } from "react";
-
-function TemperatureInput({ unit, temp, onTempChange }) {
-  return (
-    <div>
-      <label>Temperature in {unit}: </label>
-      <input
-        type="number"
-        value={temp}
-        onChange={(e) => onTempChange(e.target.value)}
-      />
-    </div>
-  );
-}
-
-function BoilingResult({ celsius }) {
-  return (
-    <p>
-      {celsius >= 100 ? "🔥 Water would boil!" : "💧 Water would NOT boil."}
-    </p>
-  );
-}
-
-// Parent holds ALL shared state
-function TemperatureCalculator() {
-  const [celsius, setCelsius] = useState(0);
-  const fahrenheit = (celsius * 9) / 5 + 32;
-
-  return (
-    <div>
-      <TemperatureInput
-        unit="Celsius"
-        temp={celsius}
-        onTempChange={(val) => setCelsius(Number(val))}
-      />
-      <TemperatureInput
-        unit="Fahrenheit"
-        temp={fahrenheit}
-        onTempChange={(val) => setCelsius(((Number(val) - 32) * 5) / 9)}
-      />
-      <BoilingResult celsius={celsius} />
-    </div>
-  );
-}`,
-  },
-  {
-    id: 13,
-    emoji: "🧱",
-    title: "Component Composition",
-    color: "#A78BFA",
-    theory: [
-      "Composition is the pattern of building complex UIs by combining simple, reusable components.",
-      "The children prop is a special prop React automatically passes — it contains whatever you put between a component's opening and closing tags.",
-      "Think of it like HTML div tags that wrap their children — you can do the same with your own components.",
-      "Composition is preferred over inheritance in React — you rarely need class-based inheritance.",
-    ],
-    notes: [
-      "props.children contains everything between the component's opening and closing tags.",
-      "Use composition to build layout wrappers: Card, Modal, Panel — generic shells that wrap any content.",
-      "You can pass JSX as any prop, not just children — this is called the slot pattern.",
-      "Composition avoids prop drilling for UI structure — children flow naturally without extra props.",
-    ],
-    code: `import { useState } from "react";
-
-// Generic Card wrapper
-function Card({ title, children, color = "#61DAFB" }) {
-  return (
-    <div style={{
-      border: \`2px solid \${color}\`,
-      borderRadius: "10px",
-      padding: "16px",
-      marginBottom: "12px",
-    }}>
-      {title && <h3 style={{ color }}>{title}</h3>}
-      {children}
-    </div>
-  );
-}
-
-// Button with children
-function FancyButton({ children, onClick, variant = "primary" }) {
-  const bg = variant === "danger" ? "#FF6B6B" : "#61DAFB";
-  const fg = variant === "danger" ? "#fff" : "#000";
-  return (
-    <button onClick={onClick}
-      style={{ background: bg, color: fg, border: "none",
-               padding: "8px 14px", borderRadius: 6, cursor: "pointer" }}>
-      {children}
-    </button>
-  );
-}
-
-// Slot pattern — named children via props
-function Layout({ sidebar, content }) {
-  return (
-    <div style={{ display: "flex", gap: "16px" }}>
-      <aside style={{ width: "150px", background: "#21262d", padding: 8, borderRadius: 6 }}>
-        {sidebar}
-      </aside>
-      <main style={{ flex: 1 }}>{content}</main>
-    </div>
-  );
-}
-
-function App() {
-  return (
-    <div>
-      <Card title="User Info" color="#34D399">
-        <p>Name: Devendra</p>
-        <FancyButton>Edit</FancyButton>{" "}
-        <FancyButton variant="danger">Delete</FancyButton>
-      </Card>
-      <Layout
-        sidebar={<p>Nav links</p>}
-        content={<p>Main content area</p>}
-      />
-    </div>
-  );
-}`,
-  },
-  {
-    id: 14,
-    emoji: "🗺️",
-    title: "React Router",
+    id: 29,
+    emoji: "🧪",
+    title: "Testing React",
     color: "#34D399",
     theory: [
-      "React Router is the standard library for adding navigation to a React app. Install it with: npm install react-router-dom",
-      "React apps are Single Page Applications (SPAs) — the browser never loads a new HTML page. React Router fakes navigation by swapping components based on the URL.",
-      "The URL changes, but the page never fully reloads. React Router intercepts browser navigation and renders the matching component.",
-      "Below is a live simulation of routing using useState so you can understand the concept. In your real project, use the actual library as shown in the Notes tab.",
+      "React Testing Library (RTL) is the standard for testing React components — it tests from the user's perspective, not implementation details.",
+      "Core philosophy: test what the user sees and interacts with, not how internal state is structured.",
+      "Jest or Vitest acts as the test runner and assertion library. RTL provides render utilities and DOM queries on top.",
+      "Install the RTL packages as dev dependencies, then write test files alongside your components.",
     ],
     notes: [
-      "BrowserRouter — wraps your entire app and provides routing context.",
-      "Routes + Route — Route path='/about' element={About} renders About when URL is /about.",
-      "Link — use instead of anchor tags for internal navigation (no page reload).",
-      "useNavigate() — navigate programmatically, e.g. after a form submit.",
-      "useParams() — read dynamic URL segments: path='/users/:id' → const { id } = useParams().",
-      "Route path='*' — catch-all 404 route, always put it last inside Routes.",
+      "render(<Component />) — mounts the component into a virtual DOM for testing.",
+      "screen.getByText(), getByRole(), getByPlaceholderText() — query elements the way a real user would.",
+      "userEvent.click(), userEvent.type() — simulate realistic browser interactions.",
+      "Prefer userEvent over fireEvent — it fires all intermediate events like a real browser does.",
+      "screen.findBy* functions are async — they wait for elements to appear after async operations.",
+      "Never test internal state variables — test the visible output the user actually sees.",
     ],
-    code: `// Live simulation of routing using only useState.
-// In your real Vite project, replace this with actual react-router-dom.
+    code: `// Tests live in files named ComponentName.test.jsx
 
-import { useState } from "react";
+// ── Basic render test ──
+test("renders initial count of 0", () => {
+  render(<Counter />);
+  expect(screen.getByText("Count: 0")).toBeInTheDocument();
+});
 
-// Page components
-function HomePage()    { return <h2>🏠 Home Page</h2>; }
-function AboutPage()   { return <h2>ℹ️ About Page</h2>; }
-function UserPage({ id }) { return <h2>👤 User Profile — ID: {id}</h2>; }
-function NotFound()    { return <h2>❌ 404 — Not Found</h2>; }
+// ── Interaction test ──
+test("increments when + button is clicked", async () => {
+  const user = userEvent.setup();
+  render(<Counter />);
 
-// Simulated router
-function App() {
-  const [route, setRoute] = useState("home");
+  const btn = screen.getByRole("button", { name: "+" });
+  await user.click(btn);
+  await user.click(btn);
 
-  function navigate(to) { setRoute(to); }
+  expect(screen.getByText("Count: 2")).toBeInTheDocument();
+});
 
-  function renderPage() {
-    if (route === "home")    return <HomePage />;
-    if (route === "about")   return <AboutPage />;
-    if (route === "user-42") return <UserPage id="42" />;
-    return <NotFound />;
-  }
+// ── Form validation test ──
+test("shows error when submitted empty", async () => {
+  const user = userEvent.setup();
+  render(<LoginForm />);
 
-  return (
-    <div>
-      {/* Simulated <Link> buttons */}
-      <nav style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-        {[
-          { label: "Home",     to: "home" },
-          { label: "About",    to: "about" },
-          { label: "User 42",  to: "user-42" },
-          { label: "Bad URL",  to: "xyz" },
-        ].map(({ label, to }) => (
-          <button key={to} onClick={() => navigate(to)}
-            style={{
-              padding: "6px 14px", borderRadius: 6, cursor: "pointer",
-              background: route === to ? "#34D399" : "#21262d",
-              color: "#fff", border: "none",
-            }}>
-            {label}
-          </button>
-        ))}
-      </nav>
+  await user.click(screen.getByRole("button", { name: "Login" }));
+  expect(screen.getByText("Both fields are required.")).toBeInTheDocument();
+});
 
-      {/* Simulated <Routes> */}
-      {renderPage()}
+// ── Mock function test ──
+test("calls onLogin with the entered credentials", async () => {
+  const user      = userEvent.setup();
+  const mockFn    = jest.fn();
 
-      <p style={{ color: "#8b949e", fontSize: 12, marginTop: 16 }}>
-        ↑ Concept demo only. Real setup uses BrowserRouter + Routes + Route + Link.
-      </p>
-    </div>
-  );
-}`,
-  },
-  {
-    id: 15,
-    emoji: "📌",
-    title: "useRef",
-    color: "#FB923C",
-    theory: [
-      "useRef returns a mutable object with a .current property that persists across renders.",
-      "Unlike state, changing ref.current does NOT trigger a re-render.",
-      "The two main uses: 1) Accessing a DOM element directly. 2) Storing a value that persists between renders without causing re-renders.",
-      "Think of useRef as a box you can put anything in — React won't touch it or re-render because of it.",
-    ],
-    notes: [
-      "Attach ref={myRef} to a JSX element, then myRef.current gives you the actual DOM node.",
-      "Common DOM uses: focus an input, scroll to element, measure element size.",
-      "For storing interval IDs, previous values, or any mutable data without triggering re-renders.",
-      "useRef vs useState: state change causes re-render. Ref change does not.",
-      "Don't read or write refs during rendering — only inside event handlers or useEffect.",
-    ],
-    code: `import { useState, useRef, useEffect } from "react";
+  render(<LoginForm onLogin={mockFn} />);
 
-// USE CASE 1: Direct DOM access — focus an input
-function AutoFocusInput() {
-  const inputRef = useRef(null);
+  await user.type(screen.getByPlaceholderText("Email"),    "dev@email.com");
+  await user.type(screen.getByPlaceholderText("Password"), "secret123");
+  await user.click(screen.getByRole("button", { name: "Login" }));
 
-  return (
-    <div>
-      <input ref={inputRef} placeholder="Click button to focus me!" />
-      <button onClick={() => inputRef.current.focus()}>
-        Focus Input
-      </button>
-    </div>
-  );
-}
-
-// USE CASE 2: Store interval ID without triggering re-renders
-function Stopwatch() {
-  const [time, setTime] = useState(0);
-  const [running, setRunning] = useState(false);
-  const intervalRef = useRef(null);
-
-  function start() {
-    setRunning(true);
-    intervalRef.current = setInterval(() => {
-      setTime((t) => t + 1);
-    }, 1000);
-  }
-
-  function stop() {
-    setRunning(false);
-    clearInterval(intervalRef.current);
-  }
-
-  return (
-    <div>
-      <p>Time: {time}s</p>
-      <button onClick={start} disabled={running}>Start</button>{" "}
-      <button onClick={stop} disabled={!running}>Stop</button>
-    </div>
-  );
-}
-
-// USE CASE 3: Track previous state value
-function PreviousValue() {
-  const [count, setCount] = useState(0);
-  const prevRef = useRef(0);
-
-  useEffect(() => {
-    prevRef.current = count; // runs after render
+  expect(mockFn).toHaveBeenCalledWith({
+    email: "dev@email.com",
+    password: "secret123",
   });
+});
 
-  return (
-    <div>
-      <p>Current: {count} | Previous: {prevRef.current}</p>
-      <button onClick={() => setCount((c) => c + 1)}>+1</button>
-    </div>
-  );
-}`,
+// ── Async data test ──
+test("shows user name after fetch completes", async () => {
+  render(<UserProfile userId={1} />);
+  const name = await screen.findByText("Leanne Graham");
+  expect(name).toBeInTheDocument();
+});`,
   },
   {
-    id: 16,
-    emoji: "🌐",
-    title: "useContext",
-    color: "#F472B6",
+    id: 30,
+    emoji: "▲",
+    title: "Next.js",
+    color: "#ffffff",
     theory: [
-      "Context solves prop drilling — when you have to pass props through many intermediate components just to reach a deeply nested child.",
-      "useContext lets any component in the tree read a shared value without explicitly passing it as a prop at every level.",
-      "Think of it like a global variable for a component tree — but safe and React-aware.",
-      "Context has two parts: a Provider (holds and broadcasts the value) and consumers (components that read it with useContext).",
+      "Next.js is a React framework that adds server-side rendering, file-based routing, API routes, and built-in optimisations on top of React.",
+      "With plain React (Vite), all rendering happens in the browser — the server sends an empty HTML shell. Next.js can render pages on the server for faster loads and better SEO.",
+      "The App Router (Next.js 13+) uses a folder-based routing system in the app/ directory — each folder maps to a URL segment automatically.",
+      "Create a project: npx create-next-app@latest my-app",
     ],
     notes: [
-      "createContext(defaultValue) — creates the context object.",
-      "ThemeContext.Provider value={...} — wraps the subtree; all descendants can now read the value.",
-      "useContext(ThemeContext) — reads the nearest Provider's value inside any child component.",
-      "When the Provider's value changes, all consumers automatically re-render.",
-      "Best for truly global data: theme, auth user, language. Don't use it for everything.",
-      "For complex state, combine Context with useReducer instead of useState.",
+      "app/page.jsx = /   |   app/about/page.jsx = /about   |   app/blog/[id]/page.jsx = /blog/42",
+      "Server Components (default) — run on the server, no useState or useEffect allowed inside.",
+      "Client Components — add 'use client' at the very top of the file to enable hooks and browser APIs.",
+      "Next.js provides a Link component for client-side navigation without a full page reload.",
+      "Next.js provides an Image component with automatic optimisation, lazy loading, and responsive sizing.",
+      "API routes: app/api/users/route.js — export GET and POST functions to build backend endpoints.",
     ],
-    code: `import { useState, useContext, createContext } from "react";
+    code: `// Create project: npx create-next-app@latest my-app
 
-// Step 1: Create the context
-const ThemeContext = createContext("light");
+// ── Folder structure ──────────────────────────
+// app/
+//   layout.jsx           root layout (wraps all pages)
+//   page.jsx             route: /
+//   about/
+//     page.jsx           route: /about
+//   blog/
+//     [id]/
+//       page.jsx         route: /blog/42
+//   api/
+//     users/
+//       route.js         API endpoint: /api/users
 
-// Step 2: Custom hook — wraps useContext for convenience
-function useTheme() {
-  return useContext(ThemeContext);
-}
-
-// Deep child — zero prop drilling needed
-function ThemedButton() {
-  const { theme, toggleTheme } = useTheme();
+// ── app/layout.jsx ────────────────────────────
+export default function RootLayout({ children }) {
   return (
-    <button onClick={toggleTheme} style={{
-      background: theme === "dark" ? "#333" : "#eee",
-      color:      theme === "dark" ? "#fff" : "#333",
-      border: "1px solid currentColor",
-      padding: "8px 16px",
-      borderRadius: "6px",
-      cursor: "pointer",
-    }}>
-      Theme: {theme} — click to toggle
-    </button>
+    <html lang="en">
+      <body>{children}</body>
+    </html>
   );
 }
 
-function ThemeLabel() {
-  const { theme } = useTheme();
-  return <p>App is in <strong>{theme}</strong> mode</p>;
+// ── app/page.jsx (Server Component) ───────────
+// async function — runs on the server, fetches directly
+export default async function HomePage() {
+  const res  = await fetch("https://jsonplaceholder.typicode.com/users/1");
+  const user = await res.json();
+  return <h1>Hello, {user.name}</h1>;
 }
 
-// Intermediate — doesn't touch theme at all
-function Toolbar() {
-  return <div><ThemedButton /><ThemeLabel /></div>;
+// ── app/blog/[id]/page.jsx (dynamic route) ────
+export default async function BlogPost({ params }) {
+  const { id } = params;
+  const res  = await fetch("https://jsonplaceholder.typicode.com/posts/" + id);
+  const post = await res.json();
+  return <article><h1>{post.title}</h1><p>{post.body}</p></article>;
 }
 
-// Step 3: Provider owns the state and wraps the tree
-function App() {
-  const [theme, setTheme] = useState("light");
-  const toggleTheme = () => setTheme((t) => (t === "light" ? "dark" : "light"));
+// ── Client Component (needs hooks) ────────────
+"use client";  // must be the very first line
 
+export default function Navbar() {
+  const [open, setOpen] = useState(false);
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
-      <h2>useContext Demo</h2>
-      <Toolbar />
-    </ThemeContext.Provider>
-  );
-}`,
-  },
-  {
-    id: 17,
-    emoji: "🪝",
-    title: "Custom Hooks",
-    color: "#38BDF8",
-    theory: [
-      "A custom hook is just a JavaScript function whose name starts with 'use' and can call other hooks inside it.",
-      "Custom hooks let you extract reusable stateful logic out of components and share it across the app.",
-      "They do not share state — each component that calls a custom hook gets its own isolated copy.",
-      "Think of them as building your own hook library, tailored to your app's specific needs.",
-    ],
-    notes: [
-      "Name must start with 'use' — this is how React enforces hook rules on your function.",
-      "Can use any built-in hooks inside: useState, useEffect, useRef, useContext, etc.",
-      "Each component calling the same custom hook gets fully independent state.",
-      "Great use cases: data fetching, form handling, local storage, window size, debouncing.",
-      "Extract into a custom hook when you find the same useState + useEffect combo in multiple places.",
-    ],
-    code: `import { useState, useEffect } from "react";
-
-// ---- useFetch: reusable data fetching ----
-function useFetch(url) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    setLoading(true);
-    fetch(url)
-      .then((res) => res.json())
-      .then((json) => { setData(json); setLoading(false); })
-      .catch((err) => { setError(err); setLoading(false); });
-  }, [url]);
-
-  return { data, loading, error };
-}
-
-// Component stays clean — no fetch logic inside
-function UserCard() {
-  const { data: user, loading, error } = useFetch(
-    "https://jsonplaceholder.typicode.com/users/1"
-  );
-  if (loading) return <p>Loading...</p>;
-  if (error)   return <p>Error!</p>;
-  return <h3>{user?.name}</h3>;
-}
-
-// ---- useToggle: reusable boolean flip ----
-function useToggle(initial = false) {
-  const [value, setValue] = useState(initial);
-  const toggle = () => setValue((v) => !v);
-  return [value, toggle];
-}
-
-function ToggleDemo() {
-  const [isOpen, toggle] = useToggle(false);
-  return (
-    <div>
-      <button onClick={toggle}>{isOpen ? "Close ▲" : "Open ▼"}</button>
-      {isOpen && <p>Panel content!</p>}
-    </div>
+    <nav>
+      {/* The Next.js Link component — no full page reload */}
+      <Link href="/">Home</Link>
+      <Link href="/about">About</Link>
+      <button onClick={() => setOpen(!open)}>Menu</button>
+    </nav>
   );
 }
 
-// ---- useWindowSize: track browser dimensions ----
-function useWindowSize() {
-  const [size, setSize] = useState({ width: 0, height: 0 });
-  useEffect(() => {
-    const update = () =>
-      setSize({ width: window.innerWidth, height: window.innerHeight });
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
-  return size;
-}`,
-  },
-  {
-    id: 18,
-    emoji: "🛡️",
-    title: "Error Boundaries",
-    color: "#FBBF24",
-    theory: [
-      "Error boundaries catch JavaScript errors anywhere in their child component tree and show a fallback UI instead of crashing the whole app.",
-      "Without error boundaries, one broken component crashes your entire app — error boundaries contain the damage to just that section.",
-      "Think of them like try/catch, but for React component rendering.",
-      "Error boundaries must be class components — it's one of the few remaining cases you need a class in modern React.",
-    ],
-    notes: [
-      "Error boundaries catch errors during: rendering, lifecycle methods, and constructors of child components.",
-      "They do NOT catch: errors in event handlers (use regular try/catch there) or async code.",
-      "getDerivedStateFromError — update state here to show the fallback UI when a child throws.",
-      "componentDidCatch — called after the error; good place to log errors to a reporting service.",
-      "Place boundaries around individual sections, not just one at the very top of the app.",
-      "Click Try Again in the demo below to reset the boundary after a crash.",
-    ],
-    code: `import { Component, useState } from "react";
-
-// Class-based Error Boundary
-class ErrorBoundary extends Component {
-  constructor(props) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error, info) {
-    console.error("Boundary caught:", error, info.componentStack);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: 16, background: "#2d1515",
-                      border: "1px solid #FF6B6B", borderRadius: 8 }}>
-          <h3>😵 Something went wrong.</h3>
-          <p style={{ color: "#FF6B6B" }}>{this.state.error?.message}</p>
-          <button onClick={() => this.setState({ hasError: false, error: null })}>
-            Try Again
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
+// ── app/api/users/route.js ─────────────────────
+export async function GET() {
+  return Response.json([{ id: 1, name: "Devendra" }]);
 }
 
-// Intentionally buggy component
-function BuggyCounter() {
-  const [count, setCount] = useState(0);
-  if (count === 3) throw new Error("Crashed at count 3!");
-  return (
-    <div>
-      <p>Count: {count} — crashes at 3</p>
-      <button onClick={() => setCount((c) => c + 1)}>+1</button>
-    </div>
-  );
-}
-
-// App — boundary contains the crash to one section
-function App() {
-  return (
-    <div>
-      <h2>Error Boundary Demo</h2>
-      <ErrorBoundary>
-        <BuggyCounter />
-      </ErrorBoundary>
-      <p style={{ color: "#34D399", marginTop: 12 }}>
-        This line is outside the boundary — still works even when above crashes.
-      </p>
-    </div>
-  );
+export async function POST(request) {
+  const body = await request.json();
+  return Response.json({ created: true, data: body });
 }`,
   },
 ];
@@ -672,22 +887,16 @@ export default function ReactNotes() {
   return (
     <div style={{
       fontFamily: "'Fira Code', 'Courier New', monospace",
-      background: "#0d1117",
-      minHeight: "100vh",
-      display: "flex",
-      color: "#e6edf3",
+      background: "#0d1117", minHeight: "100vh",
+      display: "flex", color: "#e6edf3",
     }}>
-      {/* Sidebar */}
       <div style={{
-        width: "220px", minWidth: "220px",
-        background: "#161b22",
-        borderRight: "1px solid #30363d",
-        overflowY: "auto",
-        padding: "16px 0",
+        width: "220px", minWidth: "220px", background: "#161b22",
+        borderRight: "1px solid #30363d", overflowY: "auto", padding: "16px 0",
       }}>
         <div style={{ padding: "0 16px 16px", borderBottom: "1px solid #30363d", marginBottom: "8px" }}>
-          <div style={{ fontSize: "11px", color: "#8b949e", letterSpacing: "2px", textTransform: "uppercase" }}>React Intermediate</div>
-          <div style={{ fontSize: "18px", fontWeight: "700", color: "#61DAFB", marginTop: "4px" }}>Topics 10–18</div>
+          <div style={{ fontSize: "11px", color: "#8b949e", letterSpacing: "2px", textTransform: "uppercase" }}>React Advanced</div>
+          <div style={{ fontSize: "18px", fontWeight: "700", color: "#61DAFB", marginTop: "4px" }}>Topics 19–30</div>
         </div>
         {topics.map((t, i) => (
           <button key={t.id} onClick={() => { setSelected(i); setTab("theory"); }} style={{
@@ -705,9 +914,7 @@ export default function ReactNotes() {
         ))}
       </div>
 
-      {/* Main Content */}
       <div style={{ flex: 1, overflowY: "auto" }}>
-        {/* Header */}
         <div style={{
           padding: "28px 32px 20px", borderBottom: "1px solid #30363d",
           background: "#0d1117", position: "sticky", top: 0, zIndex: 10,
@@ -715,7 +922,7 @@ export default function ReactNotes() {
           <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
             <span style={{ fontSize: "28px" }}>{topic.emoji}</span>
             <div>
-              <span style={{ fontSize: "11px", color: "#8b949e", letterSpacing: "1px" }}>TOPIC {topic.id} OF 18</span>
+              <span style={{ fontSize: "11px", color: "#8b949e", letterSpacing: "1px" }}>TOPIC {topic.id} OF 30</span>
               <h1 style={{ margin: 0, fontSize: "22px", color: topic.color }}>{topic.title}</h1>
             </div>
           </div>
@@ -735,7 +942,6 @@ export default function ReactNotes() {
           </div>
         </div>
 
-        {/* Content */}
         <div style={{ padding: "28px 32px" }}>
           {tab === "theory" && (
             <div>
@@ -789,7 +995,6 @@ export default function ReactNotes() {
           )}
         </div>
 
-        {/* Navigation */}
         <div style={{ display: "flex", justifyContent: "space-between", padding: "20px 32px 32px", gap: "12px" }}>
           <button
             onClick={() => { setSelected(Math.max(0, selected - 1)); setTab("theory"); }}
