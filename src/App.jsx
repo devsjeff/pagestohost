@@ -1,420 +1,664 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useContext, createContext, Component } from "react";
 
 const topics = [
   {
-    id: 1,
-    emoji: "⚛️",
-    title: "What is React & Why It Exists",
+    id: 10,
+    emoji: "🔁",
+    title: "useEffect",
     color: "#61DAFB",
     theory: [
-      "React is a JavaScript library (not a framework) for building user interfaces.",
-      "Before React, every time data changed, the whole HTML page had to re-render — slow and messy.",
-      "React introduced the Virtual DOM: a lightweight copy of the real DOM. When data changes, React updates only the parts that actually changed.",
-      "Think of it like this: instead of repainting the whole wall, React only repaints the scratch.",
+      "useEffect is a Hook that lets you run side effects in a functional component.",
+      "A side effect is anything that reaches outside the component: fetching data, setting a timer, manually changing the DOM, subscribing to events.",
+      "useEffect runs AFTER React renders the component to the screen — not during render.",
+      "It takes two arguments: a callback function (the effect) and a dependency array that controls WHEN the effect runs.",
     ],
     notes: [
-      "React was made by Facebook (Meta) in 2013.",
-      "React is just the UI layer — it doesn't care about routing, data fetching, etc. (you add those separately).",
-      "Virtual DOM → React figures out what changed → updates only that in the real DOM. This is called Reconciliation.",
+      "useEffect(() => {}, []) — runs ONCE after the first render (like componentDidMount).",
+      "useEffect(() => {}) — no dependency array → runs after EVERY render. Usually not what you want.",
+      "useEffect(() => {}, [count]) — runs after first render AND whenever count changes.",
+      "Return a cleanup function to cancel subscriptions, timers, etc. when the component unmounts.",
+      "Never put async directly inside useEffect. Define async function inside and call it.",
     ],
-    code: `// Without React (vanilla JS — painful):
-document.getElementById("name").innerHTML = "Devendra";
+    code: `import { useState, useEffect } from "react";
 
-// With React — you just describe WHAT the UI should look like,
-// React figures out HOW to update the DOM.
-function App() {
-  return <h1>Hello, Devendra!</h1>;
+// [] = run only once after first render
+function UserProfile() {
+  const [user, setUser] = useState(null);
+
+  useEffect(() => {
+    async function fetchUser() {
+      const res = await fetch("https://jsonplaceholder.typicode.com/users/1");
+      const data = await res.json();
+      setUser(data);
+    }
+    fetchUser();
+  }, []);
+
+  if (!user) return <p>Loading...</p>;
+  return <h2>Hello, {user.name}!</h2>;
+}
+
+// [query] = re-run whenever query changes
+function SearchBox({ query }) {
+  useEffect(() => {
+    if (!query) return;
+    console.log("Searching:", query);
+  }, [query]);
+
+  return <div>Search box</div>;
+}
+
+// Cleanup example — clear timer on unmount
+function Timer() {
+  const [seconds, setSeconds] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSeconds((s) => s + 1);
+    }, 1000);
+
+    return () => clearInterval(interval); // cleanup!
+  }, []);
+
+  return <p>Timer: {seconds}s</p>;
 }`,
   },
   {
-    id: 2,
-    emoji: "📝",
-    title: "JSX",
+    id: 11,
+    emoji: "📋",
+    title: "Forms & Controlled Components",
     color: "#F7DF1E",
     theory: [
-      "JSX = JavaScript XML. It lets you write HTML-like syntax directly inside JavaScript.",
-      "JSX is NOT HTML. It looks like HTML but gets compiled to regular JavaScript by a tool called Babel.",
-      "Every JSX element compiles down to React.createElement() calls under the hood.",
+      "In React, a controlled component is one where React controls the form input's value via state.",
+      "Every keystroke updates state, and the input's value is always driven by that state — React is the single source of truth.",
+      "This is the opposite of uncontrolled components, where the DOM itself holds the value.",
+      "Controlled components give you full control: validation, formatting, conditional disabling — all easy.",
     ],
     notes: [
-      "Use className instead of class (because class is a reserved JS keyword).",
-      "Use htmlFor instead of for (same reason).",
-      "Every JSX expression must return ONE parent element. Wrap in a <div> or empty <> fragment if needed.",
-      "JavaScript expressions inside JSX go in curly braces {}.",
-      "Self-closing tags must have a slash: <img /> not <img>.",
-    ],
-    code: `// JSX example
-function App() {
-  const name = "Devendra";
-  const age = 22;
-
-  return (
-    <>
-      <h1 className="title">Hello, {name}!</h1>
-      <p>Age: {age}</p>
-      <p>In 5 years: {age + 5}</p>
-      <img src="photo.jpg" alt="profile" />
-    </>
-  );
-}
-
-// What JSX compiles to (you never write this manually):
-// React.createElement("h1", { className: "title" }, "Hello, Devendra!")`,
-  },
-  {
-    id: 3,
-    emoji: "🧩",
-    title: "Components",
-    color: "#FF6B6B",
-    theory: [
-      "A component is just a JavaScript function that returns JSX.",
-      "Components are the building blocks of React apps — like LEGO pieces you combine together.",
-      "Think of a webpage: Header, Sidebar, Card, Footer — each is a component.",
-      "Components can be reused anywhere in your app. Write once, use many times.",
-    ],
-    notes: [
-      "Component names MUST start with a capital letter. <button> is an HTML tag, <Button> is your component.",
-      "Keep components small and focused — one component should do one thing.",
-      "Components can be nested inside other components.",
-      "The top-level component is usually called App.",
-    ],
-    code: `// A simple component
-function Greeting() {
-  return <h2>Hello from Greeting component!</h2>;
-}
-
-// A reusable Card component
-function Card() {
-  return (
-    <div className="card">
-      <h3>Card Title</h3>
-      <p>Some content here.</p>
-    </div>
-  );
-}
-
-// App uses both — components nest inside components
-function App() {
-  return (
-    <div>
-      <Greeting />
-      <Card />
-      <Card />  {/* reused! */}
-    </div>
-  );
-}`,
-  },
-  {
-    id: 4,
-    emoji: "📦",
-    title: "Props",
-    color: "#A78BFA",
-    theory: [
-      "Props (short for properties) are how you pass data from a parent component to a child component.",
-      "Props flow in ONE direction only: parent → child. Never the other way.",
-      "Props make components reusable — the same component can render different content based on props.",
-      "Think of props like arguments to a function — you pass them in, the component uses them.",
-    ],
-    notes: [
-      "Props are read-only inside the child. Never modify props.",
-      "You can pass any data type as a prop: string, number, array, object, function, even JSX.",
-      "Non-string props use curly braces: age={22}, not age='22'.",
-      "You can set default values for props using default parameters.",
-    ],
-    code: `// Child component receives props as a parameter
-function UserCard({ name, age, role }) {
-  return (
-    <div>
-      <h3>{name}</h3>
-      <p>Age: {age}</p>
-      <p>Role: {role}</p>
-    </div>
-  );
-}
-
-// Parent passes props to child
-function App() {
-  return (
-    <div>
-      <UserCard name="Devendra" age={22} role="Developer" />
-      <UserCard name="Arjun" age={25} role="Designer" />
-      <UserCard name="Priya" age={28} role="Manager" />
-    </div>
-  );
-}
-
-// Default props example
-function Button({ label = "Click Me", color = "blue" }) {
-  return <button style={{ background: color }}>{label}</button>;
-}`,
-  },
-  {
-    id: 5,
-    emoji: "⚡",
-    title: "State (useState)",
-    color: "#34D399",
-    theory: [
-      "State is data that belongs to a component and can change over time.",
-      "When state changes, React automatically re-renders the component with the new data.",
-      "Props come from outside (parent). State lives inside the component itself.",
-      "useState is a React Hook — a special function that adds state to a functional component.",
-    ],
-    notes: [
-      "useState returns an array with two things: [currentValue, setterFunction].",
-      "NEVER directly modify state like count = count + 1. Always use the setter: setCount(count + 1).",
-      "State updates may be batched — React is smart about when to re-render.",
-      "Each component instance has its own state — two <Counter /> components don't share state.",
-      "State can be any type: number, string, boolean, array, object.",
+      "Always pair value={state} with onChange={handler} on an input. Without onChange, the input becomes read-only.",
+      "For checkboxes use checked={bool} instead of value.",
+      "For select elements, put value on the select tag, not on option tags.",
+      "e.preventDefault() in onSubmit stops page reload.",
+      "Use a single state object for multi-field forms with one shared handler using e.target.name.",
     ],
     code: `import { useState } from "react";
 
-function Counter() {
-  // Declare state: initial value is 0
-  const [count, setCount] = useState(0);
-
-  return (
-    <div>
-      <p>Count: {count}</p>
-      <button onClick={() => setCount(count + 1)}>+1</button>
-      <button onClick={() => setCount(count - 1)}>-1</button>
-      <button onClick={() => setCount(0)}>Reset</button>
-    </div>
-  );
-}
-
-// Boolean state example
-function Toggle() {
-  const [isOn, setIsOn] = useState(false);
-
-  return (
-    <button onClick={() => setIsOn(!isOn)}>
-      {isOn ? "ON 🟢" : "OFF 🔴"}
-    </button>
-  );
-}`,
-  },
-  {
-    id: 6,
-    emoji: "🖱️",
-    title: "Event Handling",
-    color: "#FB923C",
-    theory: [
-      "React handles events similarly to HTML but with a few key differences.",
-      "In React, event names are camelCase (onClick, not onclick).",
-      "You pass a function reference, not a function call, as the event handler.",
-      "React uses Synthetic Events — wrappers around native browser events, so they work consistently across all browsers.",
-    ],
-    notes: [
-      "onClick={() => doSomething()} ✅ — passes a function.",
-      "onClick={doSomething()} ❌ — calls the function immediately on render!",
-      "Common events: onClick, onChange, onSubmit, onKeyDown, onMouseOver, onFocus.",
-      "Event object (e) is automatically passed to handlers — use e.target.value to get input value.",
-      "Use e.preventDefault() to stop default browser behavior (like form submission).",
-    ],
-    code: `import { useState } from "react";
-
-function EventDemo() {
-  const [text, setText] = useState("");
-
-  // Handler functions defined separately — clean approach
-  function handleClick() {
-    alert("Button clicked!");
-  }
+function LoginForm() {
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [error, setError] = useState("");
 
   function handleChange(e) {
-    setText(e.target.value); // e.target.value = what user typed
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
   }
 
   function handleSubmit(e) {
-    e.preventDefault(); // stops page from reloading
-    alert("Submitted: " + text);
+    e.preventDefault();
+    if (!form.email || !form.password) {
+      setError("Both fields are required.");
+      return;
+    }
+    setError("");
+    alert("Submitted: " + form.email);
   }
 
   return (
     <form onSubmit={handleSubmit}>
       <input
-        type="text"
-        value={text}
+        type="email"
+        name="email"
+        value={form.email}
         onChange={handleChange}
-        placeholder="Type something..."
+        placeholder="Email"
       />
-      <button type="button" onClick={handleClick}>
-        Alert
-      </button>
-      <button type="submit">Submit</button>
-      <p>You typed: {text}</p>
+      <input
+        type="password"
+        name="password"
+        value={form.password}
+        onChange={handleChange}
+        placeholder="Password"
+      />
+      {error && <p style={{ color: "red" }}>{error}</p>}
+      <button type="submit">Login</button>
     </form>
   );
-}`,
-  },
-  {
-    id: 7,
-    emoji: "🔀",
-    title: "Conditional Rendering",
-    color: "#F472B6",
-    theory: [
-      "Conditional rendering means showing different UI based on certain conditions.",
-      "Since JSX is just JavaScript, you can use normal JS logic (if, ternary, &&) to decide what to render.",
-      "React renders nothing for null, undefined, and false — useful for hiding elements.",
-    ],
-    notes: [
-      "Ternary (condition ? A : B) — use when you need to show one thing OR another.",
-      "&& operator — use when you want to show something OR nothing.",
-      "Avoid putting 0 before && (0 && <X/> will render 0!). Convert to boolean: {count > 0 && <X/>}.",
-      "For complex logic, use a regular if/else before the return statement.",
-    ],
-    code: `import { useState } from "react";
+}
 
-function ConditionalDemo() {
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [score, setScore] = useState(75);
+// Checkbox + Select
+function Preferences() {
+  const [agreed, setAgreed] = useState(false);
+  const [country, setCountry] = useState("india");
 
   return (
     <div>
-      {/* Method 1: Ternary — show one OR the other */}
-      {isLoggedIn ? (
-        <h2>Welcome back, Devendra! 👋</h2>
-      ) : (
-        <h2>Please log in.</h2>
-      )}
-
-      <button onClick={() => setIsLoggedIn(!isLoggedIn)}>
-        Toggle Login
-      </button>
-
-      {/* Method 2: && — show something OR nothing */}
-      {score >= 60 && <p>✅ You passed!</p>}
-      {score < 60 && <p>❌ You failed.</p>}
-
-      {/* Method 3: if/else before return (for complex logic) */}
-      <Grade score={score} />
+      <input
+        type="checkbox"
+        checked={agreed}
+        onChange={(e) => setAgreed(e.target.checked)}
+      />
+      <label> I agree to terms</label>
+      <br />
+      <select value={country} onChange={(e) => setCountry(e.target.value)}>
+        <option value="india">India</option>
+        <option value="usa">USA</option>
+        <option value="uk">UK</option>
+      </select>
     </div>
   );
-}
-
-function Grade({ score }) {
-  let message;
-  if (score >= 90) message = "A — Excellent!";
-  else if (score >= 75) message = "B — Good job!";
-  else if (score >= 60) message = "C — Pass";
-  else message = "F — Try again";
-
-  return <p>Grade: {message}</p>;
 }`,
   },
   {
-    id: 8,
-    emoji: "📋",
-    title: "Lists & Keys",
-    color: "#38BDF8",
+    id: 12,
+    emoji: "🏋️",
+    title: "Lifting State Up",
+    color: "#FF6B6B",
     theory: [
-      "To render a list of items in React, you use the .map() array method.",
-      ".map() transforms each item in an array into a JSX element.",
-      "React needs a key prop on each list item so it can track which items changed, were added, or removed.",
-      "Keys help React's reconciliation algorithm be efficient — without keys, React re-renders everything.",
+      "When two sibling components need to share the same state, you lift that state up to their closest common parent.",
+      "The parent holds the state and passes it down as props to both children.",
+      "The parent also passes down handler functions so children can request state changes — since props are read-only.",
+      "Data flows down (props), events flow up (callbacks). This is the core of React's one-way data flow.",
     ],
     notes: [
-      "Key must be unique among siblings — not globally unique.",
-      "Use a unique ID from your data as the key. Avoid using index as key (it causes bugs when list order changes).",
-      "Keys are not passed as props — you can't access props.key inside the child.",
-      "The key goes on the outermost element returned in the .map().",
+      "If two components need the same data, their state belongs in their closest common ancestor.",
+      "The child never modifies state directly — it calls a function passed down from the parent.",
+      "This pattern scales well but can get tedious with many levels — that's when Context or state managers help.",
+      "The parent is the single source of truth for shared state.",
     ],
     code: `import { useState } from "react";
 
-const users = [
-  { id: 1, name: "Devendra", city: "Mumbai" },
-  { id: 2, name: "Arjun", city: "Delhi" },
-  { id: 3, name: "Priya", city: "Bangalore" },
-];
-
-function UserList() {
+function TemperatureInput({ unit, temp, onTempChange }) {
   return (
-    <ul>
-      {users.map((user) => (
-        // key goes here — on the element returned from .map()
-        <li key={user.id}>
-          {user.name} — {user.city}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-// Dynamic list with state
-function TodoList() {
-  const [todos, setTodos] = useState([
-    { id: 1, text: "Learn React" },
-    { id: 2, text: "Build a project" },
-  ]);
-
-  function removeTodo(id) {
-    setTodos(todos.filter((todo) => todo.id !== id));
-  }
-
-  return (
-    <ul>
-      {todos.map((todo) => (
-        <li key={todo.id}>
-          {todo.text}
-          <button onClick={() => removeTodo(todo.id)}>❌</button>
-        </li>
-      ))}
-    </ul>
-  );
-}`,
-  },
-  {
-    id: 9,
-    emoji: "🎨",
-    title: "Basic Styling",
-    color: "#FBBF24",
-    theory: [
-      "React gives you multiple ways to style components — each with different tradeoffs.",
-      "Inline styles: written as JS objects directly in JSX. Good for dynamic styles.",
-      "CSS files: import a .css file and use className. Most familiar, works globally.",
-      "CSS Modules: scoped CSS — styles only apply to the component that imports them (no clashes).",
-    ],
-    notes: [
-      "In JSX, use className instead of class.",
-      "Inline styles use camelCase: backgroundColor not background-color.",
-      "Inline style values are strings or numbers: { fontSize: 16 } not { fontSize: '16px' } (px is auto-added for numbers).",
-      "CSS Modules give you locally scoped class names — best for large apps.",
-      "Popular alternatives: Tailwind CSS, styled-components, Emotion.",
-    ],
-    code: `// METHOD 1: Inline styles (JS object)
-function InlineStyleDemo() {
-  const isActive = true;
-
-  const boxStyle = {
-    backgroundColor: isActive ? "green" : "gray",
-    color: "white",
-    padding: "12px",
-    borderRadius: "8px",
-  };
-
-  return <div style={boxStyle}>I am {isActive ? "active" : "inactive"}</div>;
-}
-
-// METHOD 2: External CSS file
-// In App.css:
-// .title { font-size: 24px; color: navy; }
-// .card { border: 1px solid #ccc; padding: 16px; }
-
-import "./App.css";
-function CSSDemo() {
-  return (
-    <div className="card">
-      <h1 className="title">Styled with CSS file</h1>
+    <div>
+      <label>Temperature in {unit}: </label>
+      <input
+        type="number"
+        value={temp}
+        onChange={(e) => onTempChange(e.target.value)}
+      />
     </div>
   );
 }
 
-// METHOD 3: Dynamic className
-function DynamicClass({ isError }) {
+function BoilingResult({ celsius }) {
   return (
-    <p className={isError ? "error-text" : "normal-text"}>
-      {isError ? "Something went wrong!" : "All good!"}
+    <p>
+      {celsius >= 100 ? "🔥 Water would boil!" : "💧 Water would NOT boil."}
     </p>
+  );
+}
+
+// Parent holds ALL shared state
+function TemperatureCalculator() {
+  const [celsius, setCelsius] = useState(0);
+  const fahrenheit = (celsius * 9) / 5 + 32;
+
+  return (
+    <div>
+      <TemperatureInput
+        unit="Celsius"
+        temp={celsius}
+        onTempChange={(val) => setCelsius(Number(val))}
+      />
+      <TemperatureInput
+        unit="Fahrenheit"
+        temp={fahrenheit}
+        onTempChange={(val) => setCelsius(((Number(val) - 32) * 5) / 9)}
+      />
+      <BoilingResult celsius={celsius} />
+    </div>
+  );
+}`,
+  },
+  {
+    id: 13,
+    emoji: "🧱",
+    title: "Component Composition",
+    color: "#A78BFA",
+    theory: [
+      "Composition is the pattern of building complex UIs by combining simple, reusable components.",
+      "The children prop is a special prop React automatically passes — it contains whatever you put between a component's opening and closing tags.",
+      "Think of it like HTML div tags that wrap their children — you can do the same with your own components.",
+      "Composition is preferred over inheritance in React — you rarely need class-based inheritance.",
+    ],
+    notes: [
+      "props.children contains everything between the component's opening and closing tags.",
+      "Use composition to build layout wrappers: Card, Modal, Panel — generic shells that wrap any content.",
+      "You can pass JSX as any prop, not just children — this is called the slot pattern.",
+      "Composition avoids prop drilling for UI structure — children flow naturally without extra props.",
+    ],
+    code: `import { useState } from "react";
+
+// Generic Card wrapper
+function Card({ title, children, color = "#61DAFB" }) {
+  return (
+    <div style={{
+      border: \`2px solid \${color}\`,
+      borderRadius: "10px",
+      padding: "16px",
+      marginBottom: "12px",
+    }}>
+      {title && <h3 style={{ color }}>{title}</h3>}
+      {children}
+    </div>
+  );
+}
+
+// Button with children
+function FancyButton({ children, onClick, variant = "primary" }) {
+  const bg = variant === "danger" ? "#FF6B6B" : "#61DAFB";
+  const fg = variant === "danger" ? "#fff" : "#000";
+  return (
+    <button onClick={onClick}
+      style={{ background: bg, color: fg, border: "none",
+               padding: "8px 14px", borderRadius: 6, cursor: "pointer" }}>
+      {children}
+    </button>
+  );
+}
+
+// Slot pattern — named children via props
+function Layout({ sidebar, content }) {
+  return (
+    <div style={{ display: "flex", gap: "16px" }}>
+      <aside style={{ width: "150px", background: "#21262d", padding: 8, borderRadius: 6 }}>
+        {sidebar}
+      </aside>
+      <main style={{ flex: 1 }}>{content}</main>
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <div>
+      <Card title="User Info" color="#34D399">
+        <p>Name: Devendra</p>
+        <FancyButton>Edit</FancyButton>{" "}
+        <FancyButton variant="danger">Delete</FancyButton>
+      </Card>
+      <Layout
+        sidebar={<p>Nav links</p>}
+        content={<p>Main content area</p>}
+      />
+    </div>
+  );
+}`,
+  },
+  {
+    id: 14,
+    emoji: "🗺️",
+    title: "React Router",
+    color: "#34D399",
+    theory: [
+      "React Router is the standard library for adding navigation to a React app. Install it with: npm install react-router-dom",
+      "React apps are Single Page Applications (SPAs) — the browser never loads a new HTML page. React Router fakes navigation by swapping components based on the URL.",
+      "The URL changes, but the page never fully reloads. React Router intercepts browser navigation and renders the matching component.",
+      "Below is a live simulation of routing using useState so you can understand the concept. In your real project, use the actual library as shown in the Notes tab.",
+    ],
+    notes: [
+      "BrowserRouter — wraps your entire app and provides routing context.",
+      "Routes + Route — Route path='/about' element={About} renders About when URL is /about.",
+      "Link — use instead of anchor tags for internal navigation (no page reload).",
+      "useNavigate() — navigate programmatically, e.g. after a form submit.",
+      "useParams() — read dynamic URL segments: path='/users/:id' → const { id } = useParams().",
+      "Route path='*' — catch-all 404 route, always put it last inside Routes.",
+    ],
+    code: `// Live simulation of routing using only useState.
+// In your real Vite project, replace this with actual react-router-dom.
+
+import { useState } from "react";
+
+// Page components
+function HomePage()    { return <h2>🏠 Home Page</h2>; }
+function AboutPage()   { return <h2>ℹ️ About Page</h2>; }
+function UserPage({ id }) { return <h2>👤 User Profile — ID: {id}</h2>; }
+function NotFound()    { return <h2>❌ 404 — Not Found</h2>; }
+
+// Simulated router
+function App() {
+  const [route, setRoute] = useState("home");
+
+  function navigate(to) { setRoute(to); }
+
+  function renderPage() {
+    if (route === "home")    return <HomePage />;
+    if (route === "about")   return <AboutPage />;
+    if (route === "user-42") return <UserPage id="42" />;
+    return <NotFound />;
+  }
+
+  return (
+    <div>
+      {/* Simulated <Link> buttons */}
+      <nav style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        {[
+          { label: "Home",     to: "home" },
+          { label: "About",    to: "about" },
+          { label: "User 42",  to: "user-42" },
+          { label: "Bad URL",  to: "xyz" },
+        ].map(({ label, to }) => (
+          <button key={to} onClick={() => navigate(to)}
+            style={{
+              padding: "6px 14px", borderRadius: 6, cursor: "pointer",
+              background: route === to ? "#34D399" : "#21262d",
+              color: "#fff", border: "none",
+            }}>
+            {label}
+          </button>
+        ))}
+      </nav>
+
+      {/* Simulated <Routes> */}
+      {renderPage()}
+
+      <p style={{ color: "#8b949e", fontSize: 12, marginTop: 16 }}>
+        ↑ Concept demo only. Real setup uses BrowserRouter + Routes + Route + Link.
+      </p>
+    </div>
+  );
+}`,
+  },
+  {
+    id: 15,
+    emoji: "📌",
+    title: "useRef",
+    color: "#FB923C",
+    theory: [
+      "useRef returns a mutable object with a .current property that persists across renders.",
+      "Unlike state, changing ref.current does NOT trigger a re-render.",
+      "The two main uses: 1) Accessing a DOM element directly. 2) Storing a value that persists between renders without causing re-renders.",
+      "Think of useRef as a box you can put anything in — React won't touch it or re-render because of it.",
+    ],
+    notes: [
+      "Attach ref={myRef} to a JSX element, then myRef.current gives you the actual DOM node.",
+      "Common DOM uses: focus an input, scroll to element, measure element size.",
+      "For storing interval IDs, previous values, or any mutable data without triggering re-renders.",
+      "useRef vs useState: state change causes re-render. Ref change does not.",
+      "Don't read or write refs during rendering — only inside event handlers or useEffect.",
+    ],
+    code: `import { useState, useRef, useEffect } from "react";
+
+// USE CASE 1: Direct DOM access — focus an input
+function AutoFocusInput() {
+  const inputRef = useRef(null);
+
+  return (
+    <div>
+      <input ref={inputRef} placeholder="Click button to focus me!" />
+      <button onClick={() => inputRef.current.focus()}>
+        Focus Input
+      </button>
+    </div>
+  );
+}
+
+// USE CASE 2: Store interval ID without triggering re-renders
+function Stopwatch() {
+  const [time, setTime] = useState(0);
+  const [running, setRunning] = useState(false);
+  const intervalRef = useRef(null);
+
+  function start() {
+    setRunning(true);
+    intervalRef.current = setInterval(() => {
+      setTime((t) => t + 1);
+    }, 1000);
+  }
+
+  function stop() {
+    setRunning(false);
+    clearInterval(intervalRef.current);
+  }
+
+  return (
+    <div>
+      <p>Time: {time}s</p>
+      <button onClick={start} disabled={running}>Start</button>{" "}
+      <button onClick={stop} disabled={!running}>Stop</button>
+    </div>
+  );
+}
+
+// USE CASE 3: Track previous state value
+function PreviousValue() {
+  const [count, setCount] = useState(0);
+  const prevRef = useRef(0);
+
+  useEffect(() => {
+    prevRef.current = count; // runs after render
+  });
+
+  return (
+    <div>
+      <p>Current: {count} | Previous: {prevRef.current}</p>
+      <button onClick={() => setCount((c) => c + 1)}>+1</button>
+    </div>
+  );
+}`,
+  },
+  {
+    id: 16,
+    emoji: "🌐",
+    title: "useContext",
+    color: "#F472B6",
+    theory: [
+      "Context solves prop drilling — when you have to pass props through many intermediate components just to reach a deeply nested child.",
+      "useContext lets any component in the tree read a shared value without explicitly passing it as a prop at every level.",
+      "Think of it like a global variable for a component tree — but safe and React-aware.",
+      "Context has two parts: a Provider (holds and broadcasts the value) and consumers (components that read it with useContext).",
+    ],
+    notes: [
+      "createContext(defaultValue) — creates the context object.",
+      "ThemeContext.Provider value={...} — wraps the subtree; all descendants can now read the value.",
+      "useContext(ThemeContext) — reads the nearest Provider's value inside any child component.",
+      "When the Provider's value changes, all consumers automatically re-render.",
+      "Best for truly global data: theme, auth user, language. Don't use it for everything.",
+      "For complex state, combine Context with useReducer instead of useState.",
+    ],
+    code: `import { useState, useContext, createContext } from "react";
+
+// Step 1: Create the context
+const ThemeContext = createContext("light");
+
+// Step 2: Custom hook — wraps useContext for convenience
+function useTheme() {
+  return useContext(ThemeContext);
+}
+
+// Deep child — zero prop drilling needed
+function ThemedButton() {
+  const { theme, toggleTheme } = useTheme();
+  return (
+    <button onClick={toggleTheme} style={{
+      background: theme === "dark" ? "#333" : "#eee",
+      color:      theme === "dark" ? "#fff" : "#333",
+      border: "1px solid currentColor",
+      padding: "8px 16px",
+      borderRadius: "6px",
+      cursor: "pointer",
+    }}>
+      Theme: {theme} — click to toggle
+    </button>
+  );
+}
+
+function ThemeLabel() {
+  const { theme } = useTheme();
+  return <p>App is in <strong>{theme}</strong> mode</p>;
+}
+
+// Intermediate — doesn't touch theme at all
+function Toolbar() {
+  return <div><ThemedButton /><ThemeLabel /></div>;
+}
+
+// Step 3: Provider owns the state and wraps the tree
+function App() {
+  const [theme, setTheme] = useState("light");
+  const toggleTheme = () => setTheme((t) => (t === "light" ? "dark" : "light"));
+
+  return (
+    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+      <h2>useContext Demo</h2>
+      <Toolbar />
+    </ThemeContext.Provider>
+  );
+}`,
+  },
+  {
+    id: 17,
+    emoji: "🪝",
+    title: "Custom Hooks",
+    color: "#38BDF8",
+    theory: [
+      "A custom hook is just a JavaScript function whose name starts with 'use' and can call other hooks inside it.",
+      "Custom hooks let you extract reusable stateful logic out of components and share it across the app.",
+      "They do not share state — each component that calls a custom hook gets its own isolated copy.",
+      "Think of them as building your own hook library, tailored to your app's specific needs.",
+    ],
+    notes: [
+      "Name must start with 'use' — this is how React enforces hook rules on your function.",
+      "Can use any built-in hooks inside: useState, useEffect, useRef, useContext, etc.",
+      "Each component calling the same custom hook gets fully independent state.",
+      "Great use cases: data fetching, form handling, local storage, window size, debouncing.",
+      "Extract into a custom hook when you find the same useState + useEffect combo in multiple places.",
+    ],
+    code: `import { useState, useEffect } from "react";
+
+// ---- useFetch: reusable data fetching ----
+function useFetch(url) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(url)
+      .then((res) => res.json())
+      .then((json) => { setData(json); setLoading(false); })
+      .catch((err) => { setError(err); setLoading(false); });
+  }, [url]);
+
+  return { data, loading, error };
+}
+
+// Component stays clean — no fetch logic inside
+function UserCard() {
+  const { data: user, loading, error } = useFetch(
+    "https://jsonplaceholder.typicode.com/users/1"
+  );
+  if (loading) return <p>Loading...</p>;
+  if (error)   return <p>Error!</p>;
+  return <h3>{user?.name}</h3>;
+}
+
+// ---- useToggle: reusable boolean flip ----
+function useToggle(initial = false) {
+  const [value, setValue] = useState(initial);
+  const toggle = () => setValue((v) => !v);
+  return [value, toggle];
+}
+
+function ToggleDemo() {
+  const [isOpen, toggle] = useToggle(false);
+  return (
+    <div>
+      <button onClick={toggle}>{isOpen ? "Close ▲" : "Open ▼"}</button>
+      {isOpen && <p>Panel content!</p>}
+    </div>
+  );
+}
+
+// ---- useWindowSize: track browser dimensions ----
+function useWindowSize() {
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  useEffect(() => {
+    const update = () =>
+      setSize({ width: window.innerWidth, height: window.innerHeight });
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+  return size;
+}`,
+  },
+  {
+    id: 18,
+    emoji: "🛡️",
+    title: "Error Boundaries",
+    color: "#FBBF24",
+    theory: [
+      "Error boundaries catch JavaScript errors anywhere in their child component tree and show a fallback UI instead of crashing the whole app.",
+      "Without error boundaries, one broken component crashes your entire app — error boundaries contain the damage to just that section.",
+      "Think of them like try/catch, but for React component rendering.",
+      "Error boundaries must be class components — it's one of the few remaining cases you need a class in modern React.",
+    ],
+    notes: [
+      "Error boundaries catch errors during: rendering, lifecycle methods, and constructors of child components.",
+      "They do NOT catch: errors in event handlers (use regular try/catch there) or async code.",
+      "getDerivedStateFromError — update state here to show the fallback UI when a child throws.",
+      "componentDidCatch — called after the error; good place to log errors to a reporting service.",
+      "Place boundaries around individual sections, not just one at the very top of the app.",
+      "Click Try Again in the demo below to reset the boundary after a crash.",
+    ],
+    code: `import { Component, useState } from "react";
+
+// Class-based Error Boundary
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error("Boundary caught:", error, info.componentStack);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: 16, background: "#2d1515",
+                      border: "1px solid #FF6B6B", borderRadius: 8 }}>
+          <h3>😵 Something went wrong.</h3>
+          <p style={{ color: "#FF6B6B" }}>{this.state.error?.message}</p>
+          <button onClick={() => this.setState({ hasError: false, error: null })}>
+            Try Again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// Intentionally buggy component
+function BuggyCounter() {
+  const [count, setCount] = useState(0);
+  if (count === 3) throw new Error("Crashed at count 3!");
+  return (
+    <div>
+      <p>Count: {count} — crashes at 3</p>
+      <button onClick={() => setCount((c) => c + 1)}>+1</button>
+    </div>
+  );
+}
+
+// App — boundary contains the crash to one section
+function App() {
+  return (
+    <div>
+      <h2>Error Boundary Demo</h2>
+      <ErrorBoundary>
+        <BuggyCounter />
+      </ErrorBoundary>
+      <p style={{ color: "#34D399", marginTop: 12 }}>
+        This line is outside the boundary — still works even when above crashes.
+      </p>
+    </div>
   );
 }`,
   },
@@ -423,7 +667,6 @@ function DynamicClass({ isError }) {
 export default function ReactNotes() {
   const [selected, setSelected] = useState(0);
   const [tab, setTab] = useState("theory");
-
   const topic = topics[selected];
 
   return (
@@ -436,41 +679,26 @@ export default function ReactNotes() {
     }}>
       {/* Sidebar */}
       <div style={{
-        width: "220px",
-        minWidth: "220px",
+        width: "220px", minWidth: "220px",
         background: "#161b22",
         borderRight: "1px solid #30363d",
         overflowY: "auto",
         padding: "16px 0",
       }}>
-        <div style={{
-          padding: "0 16px 16px",
-          borderBottom: "1px solid #30363d",
-          marginBottom: "8px",
-        }}>
-          <div style={{ fontSize: "11px", color: "#8b949e", letterSpacing: "2px", textTransform: "uppercase" }}>React Basics</div>
-          <div style={{ fontSize: "18px", fontWeight: "700", color: "#61DAFB", marginTop: "4px" }}>Topics 1–9</div>
+        <div style={{ padding: "0 16px 16px", borderBottom: "1px solid #30363d", marginBottom: "8px" }}>
+          <div style={{ fontSize: "11px", color: "#8b949e", letterSpacing: "2px", textTransform: "uppercase" }}>React Intermediate</div>
+          <div style={{ fontSize: "18px", fontWeight: "700", color: "#61DAFB", marginTop: "4px" }}>Topics 10–18</div>
         </div>
         {topics.map((t, i) => (
-          <button
-            key={t.id}
-            onClick={() => { setSelected(i); setTab("theory"); }}
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-              width: "100%",
-              padding: "10px 16px",
-              background: selected === i ? "#21262d" : "transparent",
-              border: "none",
-              borderLeft: selected === i ? `3px solid ${t.color}` : "3px solid transparent",
-              color: selected === i ? "#e6edf3" : "#8b949e",
-              cursor: "pointer",
-              textAlign: "left",
-              fontSize: "12px",
-              transition: "all 0.15s",
-            }}
-          >
+          <button key={t.id} onClick={() => { setSelected(i); setTab("theory"); }} style={{
+            display: "flex", alignItems: "center", gap: "10px",
+            width: "100%", padding: "10px 16px",
+            background: selected === i ? "#21262d" : "transparent",
+            border: "none",
+            borderLeft: selected === i ? `3px solid ${t.color}` : "3px solid transparent",
+            color: selected === i ? "#e6edf3" : "#8b949e",
+            cursor: "pointer", textAlign: "left", fontSize: "12px", transition: "all 0.15s",
+          }}>
             <span style={{ fontSize: "16px" }}>{t.emoji}</span>
             <span style={{ lineHeight: "1.3" }}>{t.id}. {t.title}</span>
           </button>
@@ -481,60 +709,41 @@ export default function ReactNotes() {
       <div style={{ flex: 1, overflowY: "auto" }}>
         {/* Header */}
         <div style={{
-          padding: "28px 32px 20px",
-          borderBottom: "1px solid #30363d",
-          background: "#0d1117",
-          position: "sticky",
-          top: 0,
-          zIndex: 10,
+          padding: "28px 32px 20px", borderBottom: "1px solid #30363d",
+          background: "#0d1117", position: "sticky", top: 0, zIndex: 10,
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "16px" }}>
             <span style={{ fontSize: "28px" }}>{topic.emoji}</span>
             <div>
-              <span style={{ fontSize: "11px", color: "#8b949e", letterSpacing: "1px" }}>TOPIC {topic.id} OF 9</span>
+              <span style={{ fontSize: "11px", color: "#8b949e", letterSpacing: "1px" }}>TOPIC {topic.id} OF 18</span>
               <h1 style={{ margin: 0, fontSize: "22px", color: topic.color }}>{topic.title}</h1>
             </div>
           </div>
-          {/* Tabs */}
           <div style={{ display: "flex", gap: "4px" }}>
             {["theory", "notes", "code"].map((t) => (
-              <button
-                key={t}
-                onClick={() => setTab(t)}
-                style={{
-                  padding: "6px 16px",
-                  borderRadius: "6px",
-                  border: "1px solid",
-                  borderColor: tab === t ? topic.color : "#30363d",
-                  background: tab === t ? topic.color + "22" : "transparent",
-                  color: tab === t ? topic.color : "#8b949e",
-                  cursor: "pointer",
-                  fontSize: "12px",
-                  fontFamily: "inherit",
-                  textTransform: "capitalize",
-                  letterSpacing: "0.5px",
-                }}
-              >
+              <button key={t} onClick={() => setTab(t)} style={{
+                padding: "6px 16px", borderRadius: "6px", border: "1px solid",
+                borderColor: tab === t ? topic.color : "#30363d",
+                background: tab === t ? topic.color + "22" : "transparent",
+                color: tab === t ? topic.color : "#8b949e",
+                cursor: "pointer", fontSize: "12px", fontFamily: "inherit",
+                textTransform: "capitalize", letterSpacing: "0.5px",
+              }}>
                 {t === "theory" ? "📖 Theory" : t === "notes" ? "📌 Notes" : "💻 Code"}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Content Area */}
+        {/* Content */}
         <div style={{ padding: "28px 32px" }}>
           {tab === "theory" && (
             <div>
               {topic.theory.map((point, i) => (
                 <div key={i} style={{
-                  display: "flex",
-                  gap: "14px",
-                  marginBottom: "16px",
-                  padding: "16px",
-                  background: "#161b22",
-                  borderRadius: "10px",
-                  border: "1px solid #30363d",
-                  borderLeft: `3px solid ${topic.color}`,
+                  display: "flex", gap: "14px", marginBottom: "16px",
+                  padding: "16px", background: "#161b22", borderRadius: "10px",
+                  border: "1px solid #30363d", borderLeft: `3px solid ${topic.color}`,
                 }}>
                   <span style={{ color: topic.color, fontWeight: "bold", fontSize: "14px", minWidth: "20px" }}>{i + 1}.</span>
                   <p style={{ margin: 0, color: "#c9d1d9", lineHeight: "1.7", fontSize: "14px" }}>{point}</p>
@@ -544,121 +753,77 @@ export default function ReactNotes() {
           )}
 
           {tab === "notes" && (
-            <div>
-              <div style={{
-                background: "#161b22",
-                border: "1px solid #30363d",
-                borderRadius: "10px",
-                padding: "20px",
-              }}>
-                {topic.notes.map((note, i) => (
-                  <div key={i} style={{
-                    display: "flex",
-                    gap: "10px",
-                    padding: "10px 0",
-                    borderBottom: i < topic.notes.length - 1 ? "1px solid #21262d" : "none",
-                  }}>
-                    <span style={{ color: topic.color, fontSize: "16px" }}>→</span>
-                    <p style={{ margin: 0, color: "#c9d1d9", lineHeight: "1.7", fontSize: "14px" }}>{note}</p>
-                  </div>
-                ))}
-              </div>
+            <div style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: "10px", padding: "20px" }}>
+              {topic.notes.map((note, i) => (
+                <div key={i} style={{
+                  display: "flex", gap: "10px", padding: "10px 0",
+                  borderBottom: i < topic.notes.length - 1 ? "1px solid #21262d" : "none",
+                }}>
+                  <span style={{ color: topic.color, fontSize: "16px" }}>→</span>
+                  <p style={{ margin: 0, color: "#c9d1d9", lineHeight: "1.7", fontSize: "14px" }}>{note}</p>
+                </div>
+              ))}
             </div>
           )}
 
           {tab === "code" && (
-            <div>
+            <div style={{ background: "#161b22", border: "1px solid #30363d", borderRadius: "10px", overflow: "hidden" }}>
               <div style={{
-                background: "#161b22",
-                border: "1px solid #30363d",
-                borderRadius: "10px",
-                overflow: "hidden",
+                background: "#21262d", padding: "10px 16px",
+                display: "flex", alignItems: "center", gap: "8px",
+                borderBottom: "1px solid #30363d",
               }}>
-                <div style={{
-                  background: "#21262d",
-                  padding: "10px 16px",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "8px",
-                  borderBottom: "1px solid #30363d",
-                }}>
-                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ff5f57", display: "inline-block" }} />
-                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#febc2e", display: "inline-block" }} />
-                  <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#28c840", display: "inline-block" }} />
-                  <span style={{ fontSize: "12px", color: "#8b949e", marginLeft: "8px" }}>example.jsx</span>
-                </div>
-                <pre style={{
-                  margin: 0,
-                  padding: "20px",
-                  overflowX: "auto",
-                  fontSize: "13px",
-                  lineHeight: "1.8",
-                  color: "#e6edf3",
-                  whiteSpace: "pre-wrap",
-                  wordBreak: "break-word",
-                }}>
-                  <code>{topic.code}</code>
-                </pre>
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#ff5f57", display: "inline-block" }} />
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#febc2e", display: "inline-block" }} />
+                <span style={{ width: 10, height: 10, borderRadius: "50%", background: "#28c840", display: "inline-block" }} />
+                <span style={{ fontSize: "12px", color: "#8b949e", marginLeft: "8px" }}>example.jsx</span>
               </div>
+              <pre style={{
+                margin: 0, padding: "20px", overflowX: "auto",
+                fontSize: "13px", lineHeight: "1.8", color: "#e6edf3",
+                whiteSpace: "pre-wrap", wordBreak: "break-word",
+              }}>
+                <code>{topic.code}</code>
+              </pre>
             </div>
           )}
         </div>
 
         {/* Navigation */}
-        <div style={{
-          display: "flex",
-          justifyContent: "space-between",
-          padding: "20px 32px 32px",
-          gap: "12px",
-        }}>
+        <div style={{ display: "flex", justifyContent: "space-between", padding: "20px 32px 32px", gap: "12px" }}>
           <button
             onClick={() => { setSelected(Math.max(0, selected - 1)); setTab("theory"); }}
             disabled={selected === 0}
             style={{
-              padding: "10px 20px",
-              borderRadius: "8px",
-              border: "1px solid #30363d",
+              padding: "10px 20px", borderRadius: "8px", border: "1px solid #30363d",
               background: selected === 0 ? "#161b22" : "#21262d",
               color: selected === 0 ? "#484f58" : "#c9d1d9",
               cursor: selected === 0 ? "not-allowed" : "pointer",
-              fontSize: "13px",
-              fontFamily: "inherit",
+              fontSize: "13px", fontFamily: "inherit",
             }}
-          >
-            ← Previous
-          </button>
+          >← Previous</button>
+
           <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
             {topics.map((_, i) => (
-              <div
-                key={i}
-                onClick={() => { setSelected(i); setTab("theory"); }}
-                style={{
-                  width: selected === i ? "20px" : "8px",
-                  height: "8px",
-                  borderRadius: "4px",
-                  background: selected === i ? topic.color : "#30363d",
-                  cursor: "pointer",
-                  transition: "all 0.2s",
-                }}
-              />
+              <div key={i} onClick={() => { setSelected(i); setTab("theory"); }} style={{
+                width: selected === i ? "20px" : "8px", height: "8px", borderRadius: "4px",
+                background: selected === i ? topic.color : "#30363d",
+                cursor: "pointer", transition: "all 0.2s",
+              }} />
             ))}
           </div>
+
           <button
             onClick={() => { setSelected(Math.min(topics.length - 1, selected + 1)); setTab("theory"); }}
             disabled={selected === topics.length - 1}
             style={{
-              padding: "10px 20px",
-              borderRadius: "8px",
-              border: "1px solid #30363d",
+              padding: "10px 20px", borderRadius: "8px", border: "1px solid #30363d",
               background: selected === topics.length - 1 ? "#161b22" : "#21262d",
               color: selected === topics.length - 1 ? "#484f58" : "#c9d1d9",
               cursor: selected === topics.length - 1 ? "not-allowed" : "pointer",
-              fontSize: "13px",
-              fontFamily: "inherit",
+              fontSize: "13px", fontFamily: "inherit",
             }}
-          >
-            Next →
-          </button>
+          >Next →</button>
         </div>
       </div>
     </div>
